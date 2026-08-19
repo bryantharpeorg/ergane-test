@@ -3,3 +3,7 @@ runtime: bwrap
 gates:
   test: 'true'
 landing_branch: main
+# Injected into every dispatched node's prompt as "Read `<path>` in this
+# worktree before you write code, and obey it." Resolved against the node's
+# worktree at dispatch, so it must stay committed.
+standards: .specify/memory/constitution.md
