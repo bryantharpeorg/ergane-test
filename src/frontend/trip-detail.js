@@ -1,5 +1,9 @@
 "use strict";
 
+const CATEGORIES = ["Lodging", "Food", "Transport", "Gear", "Fees", "Other"];
+
+let currentFilter = null;
+
 function formatCents(totalCents) {
   const dollars = Math.floor(totalCents / 100);
   const cents = String(totalCents % 100).padStart(2, "0");
@@ -30,18 +34,139 @@ async function loadTrip() {
 
   const data = await response.json();
   renderTrip(data);
+  await loadFilteredExpenses();
+}
+
+async function loadFilteredExpenses() {
+  const tripId = getTripId();
+  if (!tripId) return;
+
+  const url = currentFilter
+    ? `/api/trips/${tripId}/expenses?category=${encodeURIComponent(currentFilter)}`
+    : `/api/trips/${tripId}/expenses`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    return;
+  }
+
+  const expenses = await response.json();
+  renderExpenses(expenses);
 }
 
 function renderTrip(data) {
   const trip = data.trip;
-  const expenses = data.expenses || [];
+  const subtotals = data.subtotals || [];
   const totalCents = data.total_cents;
 
   document.getElementById("trip-name").textContent = trip.name;
   document.getElementById("trip-meta").textContent = `${trip.destination} · ${formatRange(trip.start_date, trip.end_date)}`;
   document.getElementById("trip-total").textContent = formatCents(totalCents);
 
-  renderExpenses(expenses);
+  renderSubtotals(subtotals);
+  renderChart(subtotals);
+  renderFilterControl();
+}
+
+function renderFilterControl() {
+  const container = document.getElementById("category-filter");
+  const existing = container.querySelector("select");
+  if (existing) return;
+
+  const select = document.createElement("select");
+  select.id = "category-filter-select";
+
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = "All categories";
+  select.appendChild(allOption);
+
+  for (const category of CATEGORIES) {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    select.appendChild(option);
+  }
+
+  select.addEventListener("change", async () => {
+    const value = select.value;
+    currentFilter = value || null;
+    await loadFilteredExpenses();
+  });
+
+  container.replaceChildren(select);
+}
+
+function renderSubtotals(subtotals) {
+  const container = document.getElementById("subtotals-list");
+  container.replaceChildren();
+
+  if (subtotals.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No spending recorded yet.";
+    container.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("ul");
+  list.className = "subtotals-list";
+  for (const item of subtotals) {
+    const li = document.createElement("li");
+    const label = document.createElement("span");
+    label.className = "subtotal-category";
+    label.textContent = item.category;
+    const value = document.createElement("span");
+    value.className = "subtotal-value";
+    value.textContent = formatCents(item.subtotal_cents);
+    li.append(label, value);
+    list.appendChild(li);
+  }
+  container.appendChild(list);
+}
+
+function renderChart(subtotals) {
+  const container = document.getElementById("chart-container");
+  container.replaceChildren();
+
+  if (subtotals.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No data to chart yet.";
+    container.appendChild(empty);
+    return;
+  }
+
+  const maxSubtotal = Math.max(...subtotals.map((item) => item.subtotal_cents));
+  const chart = document.createElement("div");
+  chart.className = "bar-chart";
+
+  for (const item of subtotals) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+
+    const label = document.createElement("div");
+    label.className = "bar-label";
+    label.textContent = item.category;
+
+    const track = document.createElement("div");
+    track.className = "bar-track";
+
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    const widthPercent = (item.subtotal_cents / maxSubtotal) * 100;
+    fill.style.width = `${widthPercent}%`;
+
+    const value = document.createElement("div");
+    value.className = "bar-value";
+    value.textContent = formatCents(item.subtotal_cents);
+
+    track.appendChild(fill);
+    row.append(label, track, value);
+    chart.appendChild(row);
+  }
+
+  container.appendChild(chart);
 }
 
 function renderExpenses(expenses) {
@@ -139,6 +264,7 @@ document.getElementById("add-expense-form").addEventListener("submit", async (ev
 
   if (response.ok) {
     form.reset();
+    // Preserve the current category filter while refreshing everything else.
     await loadTrip();
   }
 });

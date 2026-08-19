@@ -155,11 +155,70 @@ def get_trip(trip_id: int) -> Dict[str, Any]:
             (trip_id,),
         ).fetchone()[0]
 
+        subtotal_rows = conn.execute(
+            """
+            SELECT category, SUM(amount_cents) AS subtotal_cents
+            FROM expenses
+            WHERE trip_id = ?
+            GROUP BY category
+            ORDER BY subtotal_cents DESC, category
+            """,
+            (trip_id,),
+        ).fetchall()
+        subtotals = [
+            {"category": row["category"], "subtotal_cents": int(row["subtotal_cents"])}
+            for row in subtotal_rows
+        ]
+
         return {
             "trip": _trip_row(trip, int(total_cents)),
             "expenses": [_expense_row(row) for row in expenses],
+            "subtotals": subtotals,
             "total_cents": int(total_cents),
         }
+    finally:
+        conn.close()
+
+
+@app.get("/api/trips/{trip_id}/expenses")
+def list_expenses(trip_id: int, category: str = None) -> List[Dict[str, Any]]:
+    conn = get_conn()
+    try:
+        trip = conn.execute("SELECT id FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="trip not found")
+
+        if category is not None:
+            try:
+                parse_category(category)
+            except ValidationError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+            category_filter = category
+        else:
+            category_filter = None
+
+        if category_filter is not None:
+            rows = conn.execute(
+                """
+                SELECT id, trip_id, date, amount_cents, category, note
+                FROM expenses
+                WHERE trip_id = ? AND category = ?
+                ORDER BY date DESC, id DESC
+                """,
+                (trip_id, category_filter),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, trip_id, date, amount_cents, category, note
+                FROM expenses
+                WHERE trip_id = ?
+                ORDER BY date DESC, id DESC
+                """,
+                (trip_id,),
+            ).fetchall()
+
+        return [_expense_row(row) for row in rows]
     finally:
         conn.close()
 
