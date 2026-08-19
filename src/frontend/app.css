@@ -251,3 +251,38 @@ tbody tr:hover {
 .filter-section select {
   min-width: 12rem;
 }
+
+.import-form textarea,
+#import-csv {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  font-family: inherit;
+}
+
+.import-section button {
+  align-self: start;
+  margin-bottom: 0.75rem;
+}
+
+.import-result {
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
+.import-error {
+  color: #dc2626;
+}
+
+#import-details {
+  margin-top: 0.5rem;
+}
+
+#import-details summary {
+  cursor: pointer;
+  color: #2563eb;
+}
+
+#import-details-list {
+  margin: 0.5rem 0 0 1.25rem;
+  color: #dc2626;
+}

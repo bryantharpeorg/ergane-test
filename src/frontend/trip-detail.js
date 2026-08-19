@@ -269,4 +269,78 @@ document.getElementById("add-expense-form").addEventListener("submit", async (ev
   }
 });
 
-document.addEventListener("DOMContentLoaded", loadTrip);
+function renderImportForm() {
+  const container = document.getElementById("import-form");
+  container.replaceChildren();
+
+  const textarea = document.createElement("textarea");
+  textarea.id = "import-csv";
+  textarea.rows = 6;
+  textarea.placeholder = "Paste CSV rows: date, amount, category, note";
+  textarea.style.width = "100%";
+
+  const submitButton = document.createElement("button");
+  submitButton.id = "import-submit";
+  submitButton.textContent = "Import";
+
+  const resultArea = document.createElement("div");
+  resultArea.id = "import-result";
+  resultArea.className = "import-result";
+
+  const detailsArea = document.createElement("details");
+  detailsArea.id = "import-details";
+  const summary = document.createElement("summary");
+  summary.textContent = "Skipped row details";
+  detailsArea.appendChild(summary);
+  const detailsList = document.createElement("ul");
+  detailsList.id = "import-details-list";
+  detailsArea.appendChild(detailsList);
+
+  submitButton.addEventListener("click", async () => {
+    resultArea.textContent = "";
+    detailsArea.open = false;
+    detailsList.replaceChildren();
+
+    const tripId = getTripId();
+    const response = await fetch(`/api/trips/${tripId}/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv: textarea.value }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      resultArea.textContent = data.errors?.csv || "Import failed.";
+      resultArea.className = "import-result import-error";
+      return;
+    }
+
+    const data = await response.json();
+    resultArea.textContent = `Added ${data.added}, skipped ${data.skipped}`;
+    resultArea.className = "import-result";
+
+    if (data.skipped > 0 && data.skipped_details?.length) {
+      for (const detail of data.skipped_details) {
+        const li = document.createElement("li");
+        li.textContent = `Line ${detail.line}: ${detail.reason}`;
+        detailsList.appendChild(li);
+      }
+      detailsArea.open = true;
+    }
+
+    textarea.value = "";
+    await loadTrip();
+  });
+
+  container.append(textarea, submitButton, resultArea, detailsArea);
+}
+
+document.getElementById("export-btn").addEventListener("click", () => {
+  const tripId = getTripId();
+  window.location.href = `/api/trips/${tripId}/export.csv`;
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadTrip();
+  renderImportForm();
+});
