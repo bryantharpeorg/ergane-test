@@ -59,9 +59,9 @@ def parse_category(value: str, *, lenient: bool = False) -> str:
     "Food" because "food" case-insensitively matches the CATEGORIES tuple.
     """
     if lenient:
-        value = value.strip().casefold()
+        normalized = value.strip().casefold()
         for category in CATEGORIES:
-            if category.casefold() == value:
+            if category.casefold() == normalized:
                 return category
         raise ValidationError("category not one of the six")
     else:
