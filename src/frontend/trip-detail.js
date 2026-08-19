@@ -1,5 +1,9 @@
 "use strict";
 
+const CATEGORIES = ["Lodging", "Food", "Transport", "Gear", "Fees", "Other"];
+
+let currentFilter = null;
+
 function formatCents(totalCents) {
   const dollars = Math.floor(totalCents / 100);
   const cents = String(totalCents % 100).padStart(2, "0");
@@ -30,11 +34,28 @@ async function loadTrip() {
 
   const data = await response.json();
   renderTrip(data);
+  await loadFilteredExpenses();
+}
+
+async function loadFilteredExpenses() {
+  const tripId = getTripId();
+  if (!tripId) return;
+
+  const url = currentFilter
+    ? `/api/trips/${tripId}/expenses?category=${encodeURIComponent(currentFilter)}`
+    : `/api/trips/${tripId}/expenses`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    return;
+  }
+
+  const expenses = await response.json();
+  renderExpenses(expenses);
 }
 
 function renderTrip(data) {
   const trip = data.trip;
-  const expenses = data.expenses || [];
   const subtotals = data.subtotals || [];
   const totalCents = data.total_cents;
 
@@ -44,7 +65,36 @@ function renderTrip(data) {
 
   renderSubtotals(subtotals);
   renderChart(subtotals);
-  renderExpenses(expenses);
+  renderFilterControl();
+}
+
+function renderFilterControl() {
+  const container = document.getElementById("category-filter");
+  const existing = container.querySelector("select");
+  if (existing) return;
+
+  const select = document.createElement("select");
+  select.id = "category-filter-select";
+
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = "All categories";
+  select.appendChild(allOption);
+
+  for (const category of CATEGORIES) {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    select.appendChild(option);
+  }
+
+  select.addEventListener("change", async () => {
+    const value = select.value;
+    currentFilter = value || null;
+    await loadFilteredExpenses();
+  });
+
+  container.replaceChildren(select);
 }
 
 function renderSubtotals(subtotals) {
