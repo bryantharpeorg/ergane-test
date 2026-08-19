@@ -208,19 +208,31 @@ US3, US4 and US5 all hang off US2 rather than off each other — tasks.md record
 them as independent — so the factory may run them concurrently once US2 lands.
 
 `implements` partitions all twenty-one functional requirements across the five
-nodes, so each FR is judged against exactly one diff. The cross-cutting
-negatives FR-020 (no authentication) and FR-021 (local only) sit on US1 because
-US1 is the node that creates the application skeleton and its routes.
+nodes, so each FR is judged against exactly one diff — and the partition follows
+**where the delivering code lands, not which feature it reads as**. The judge is
+handed one node's diff and its criteria, nothing else, so an FR assigned to a
+node whose diff does not contain the code that satisfies it fails honestly and
+cannot be argued out of it.
+
+That is not hypothetical: US2 was first given FR-002, FR-009 and FR-010, whose
+schema and validators are built by US1's foundation. The judge failed it, and
+the next attempt "fixed" it by editing `src/validators.py` cosmetically so the
+file would appear in the graded diff — padding the diff to satisfy the grader,
+which is the exact failure Principle IV names. Those three moved to US1.
+
+The cross-cutting negatives FR-020 (no authentication) and FR-021 (local only)
+sit on US1 for the same reason: US1 creates the skeleton, the routes and the
+frontend the searches run over.
 
 ```yaml
 US1:
   depends_on: []
-  implements: [FR-001, FR-003, FR-005, FR-020, FR-021]
+  implements: [FR-001, FR-002, FR-003, FR-005, FR-009, FR-010, FR-020, FR-021]
 
 US2:
   depends_on: []
   depends_on_merged: [US1]
-  implements: [FR-002, FR-004, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011]
+  implements: [FR-004, FR-006, FR-007, FR-008, FR-011]
 
 US3:
   depends_on: []
