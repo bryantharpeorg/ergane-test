@@ -1,5 +1,5 @@
 ---
-state: draft
+state: ready
 depends_on_landed: []
 ---
 
