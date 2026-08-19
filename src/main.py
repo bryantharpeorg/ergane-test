@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from db import get_conn, init_db, DATABASE_PATH
 from seed import seed
-from validators import parse_date, ValidationError
+from validators import parse_amount_to_cents, parse_category, parse_date, format_cents, ValidationError
 
 
 @asynccontextmanager
@@ -110,6 +110,139 @@ def create_trip(payload: Dict[str, Any]) -> JSONResponse:
         )
     finally:
         conn.close()
+
+
+def _expense_row(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "id": row["id"],
+        "trip_id": row["trip_id"],
+        "date": row["date"],
+        "amount_cents": row["amount_cents"],
+        "category": row["category"],
+        "note": row["note"],
+    }
+
+
+@app.get("/api/trips/{trip_id}")
+def get_trip(trip_id: int) -> Dict[str, Any]:
+    conn = get_conn()
+    try:
+        trip = conn.execute(
+            "SELECT id, name, destination, start_date, end_date FROM trips WHERE id = ?",
+            (trip_id,),
+        ).fetchone()
+        if trip is None:
+            raise HTTPException(status_code=404, detail="trip not found")
+
+        expenses = conn.execute(
+            """
+            SELECT id, trip_id, date, amount_cents, category, note
+            FROM expenses
+            WHERE trip_id = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (trip_id,),
+        ).fetchall()
+
+        total_cents = conn.execute(
+            "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE trip_id = ?",
+            (trip_id,),
+        ).fetchone()[0]
+
+        return {
+            "trip": _trip_row(trip, int(total_cents)),
+            "expenses": [_expense_row(row) for row in expenses],
+            "total_cents": int(total_cents),
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/api/trips/{trip_id}/expenses")
+def create_expense(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
+    errors: Dict[str, str] = {}
+
+    date_value = payload.get("date", "")
+    if not isinstance(date_value, str):
+        errors["date"] = "must be a date in YYYY-MM-DD format"
+    else:
+        try:
+            parsed_date = parse_date(date_value)
+        except ValidationError as exc:
+            errors["date"] = str(exc)
+
+    amount_value = payload.get("amount", "")
+    if not isinstance(amount_value, str):
+        errors["amount"] = "must be a positive number with at most two decimals"
+    else:
+        try:
+            amount_cents = parse_amount_to_cents(amount_value)
+        except ValidationError as exc:
+            errors["amount"] = str(exc)
+
+    category_value = payload.get("category", "")
+    if not isinstance(category_value, str):
+        errors["category"] = "category not one of the six"
+    else:
+        try:
+            parsed_category = parse_category(category_value)
+        except ValidationError as exc:
+            errors["category"] = str(exc)
+
+    note = payload.get("note", "")
+    if not isinstance(note, str):
+        errors["note"] = "note must be a string"
+    else:
+        note = note.strip()
+        if len(note) > 500:
+            errors["note"] = "note must be 500 characters or fewer"
+
+    if errors:
+        return JSONResponse({"errors": errors}, status_code=422)
+
+    conn = get_conn()
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?", (trip_id,)
+        ).fetchone()
+        if trip is None:
+            raise HTTPException(status_code=404, detail="trip not found")
+
+        cursor = conn.execute(
+            """
+            INSERT INTO expenses (trip_id, date, amount_cents, category, note)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (trip_id, parsed_date, amount_cents, parsed_category, note),
+        )
+        expense_id = cursor.lastrowid
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT id, trip_id, date, amount_cents, category, note FROM expenses WHERE id = ?",
+            (expense_id,),
+        ).fetchone()
+        return JSONResponse(_expense_row(row), status_code=201)
+    finally:
+        conn.close()
+
+
+@app.delete("/api/expenses/{expense_id}")
+def delete_expense(expense_id: int):
+    conn = get_conn()
+    try:
+        cursor = conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="expense not found")
+        conn.commit()
+        return JSONResponse({}, status_code=204)
+    finally:
+        conn.close()
+
+
+@app.get("/trips/{trip_id}")
+def trip_detail(trip_id: int):
+    return FileResponse(os.path.join(os.path.dirname(__file__), "frontend", "trip.html"))
 
 
 @app.get("/")
