@@ -1,0 +1,117 @@
+import os
+import sqlite3
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from db import get_conn, init_db, DATABASE_PATH
+from seed import seed
+from validators import parse_date, ValidationError
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    os.makedirs(os.path.dirname(DATABASE_PATH) or ".", exist_ok=True)
+    init_db()
+    seed()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "frontend")), name="static")
+
+
+def _trip_row(row: sqlite3.Row, total_cents: int) -> Dict[str, Any]:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "destination": row["destination"],
+        "start_date": row["start_date"],
+        "end_date": row["end_date"],
+        "total_cents": total_cents,
+    }
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.get("/api/trips")
+def list_trips() -> List[Dict[str, Any]]:
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT trips.id, trips.name, trips.destination, trips.start_date, trips.end_date,
+                   COALESCE(SUM(expenses.amount_cents), 0) AS total_cents
+            FROM trips
+            LEFT JOIN expenses ON expenses.trip_id = trips.id
+            GROUP BY trips.id
+            ORDER BY trips.id
+            """
+        ).fetchall()
+        return [_trip_row(row, int(row["total_cents"])) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/api/trips")
+def create_trip(payload: Dict[str, Any]) -> JSONResponse:
+    errors: Dict[str, str] = {}
+
+    name = payload.get("name", "").strip() if isinstance(payload.get("name"), str) else ""
+    if not name:
+        errors["name"] = "name is required"
+
+    destination = payload.get("destination", "").strip() if isinstance(payload.get("destination"), str) else ""
+    if not destination:
+        errors["destination"] = "destination is required"
+
+    start_date = payload.get("start_date", "")
+    end_date = payload.get("end_date", "")
+
+    for field, value in (("start_date", start_date), ("end_date", end_date)):
+        if not isinstance(value, str):
+            errors[field] = "must be a date in YYYY-MM-DD format"
+        else:
+            try:
+                parse_date(value)
+            except ValidationError as exc:
+                errors[field] = str(exc)
+
+    if "start_date" not in errors and "end_date" not in errors:
+        if end_date < start_date:
+            errors["end_date"] = "end_date must be on or after start_date"
+
+    if errors:
+        return JSONResponse({"errors": errors}, status_code=422)
+
+    conn = get_conn()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO trips (name, destination, start_date, end_date) VALUES (?, ?, ?, ?)",
+            (name, destination, start_date, end_date),
+        )
+        trip_id = cursor.lastrowid
+        conn.commit()
+        return JSONResponse(
+            _trip_row(
+                conn.execute(
+                    "SELECT id, name, destination, start_date, end_date FROM trips WHERE id = ?",
+                    (trip_id,),
+                ).fetchone(),
+                0,
+            ),
+            status_code=201,
+        )
+    finally:
+        conn.close()
+
+
+@app.get("/")
+def index():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "frontend", "index.html"))
