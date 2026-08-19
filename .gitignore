@@ -1,1 +1,14 @@
 .ergane/
+
+# Bytecode. `scripts/gate.sh` byte-compiles the tree, and a gate must not be
+# able to add files to the diff it is judging — us1 committed four .pyc files
+# this way before PYTHONPYCACHEPREFIX was set in the gate.
+__pycache__/
+*.pyc
+
+# Legacy runtime root. The worker is pinned to an absolute ERGANE_ROOT outside
+# this repo, but `resolve_factory_root` falls back to a *relative* `.factory`
+# resolved against the worker's cwd, and `git worktree add` runs with cwd set
+# to this repo — so losing that pin drops factory state, worktrees included,
+# straight into the clone. Salvage would then commit it.
+.factory/

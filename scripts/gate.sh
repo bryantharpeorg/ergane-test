@@ -33,6 +33,11 @@ ok()   { printf '   PASS %s\n' "$1"; }
 bad()  { printf '   FAIL %s\n' "$1"; fail=1; }
 
 step "python syntax"
+# Bytecode goes outside the tree: this gate runs inside the worktree an agent
+# is judged on, and a check that writes files into the diff it is checking has
+# changed the thing it was measuring. us1 committed four .pyc files before this
+# line existed.
+export PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/ergane-gate-pycache"
 mapfile -t pyfiles < <(find . -name '*.py' -not -path './.git/*' | sort)
 if [ ${#pyfiles[@]} -eq 0 ]; then
   ok "no python in the tree yet"
