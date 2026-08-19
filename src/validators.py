@@ -14,17 +14,20 @@ class ValidationError(ValueError):
 def parse_amount_to_cents(value: str) -> int:
     r"""Convert a decimal dollar string to integer cents.
 
-    Accepts values matching ^\d+(\.\d{1,2})?$ such as "124.50", rejects
-    zero ("0"), negatives ("-5"), and more than two decimal places
+    Accepts values matching ^\d+(\.\d{1,2})?$ such as "124.50" or "0.05".
+    Rejects zero ("0"), negatives ("-5"), and more than two decimal places
     ("12.345"). Returns integer cents strictly greater than zero.
     """
     value = value.strip()
+    if not value:
+        raise ValidationError("amount is required")
     if not _AMOUNT_RE.match(value):
         raise ValidationError("must be a positive number with at most two decimals")
     dollars, _, cents_part = value.partition(".")
     dollars = int(dollars)
     cents = int(cents_part.ljust(2, "0")) if cents_part else 0
     total = dollars * 100 + cents
+    # The regex already prevents negatives; this also rejects "0" and "0.00".
     if total <= 0:
         raise ValidationError("amount must be greater than zero")
     return total
