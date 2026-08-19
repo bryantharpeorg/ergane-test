@@ -1,7 +1,13 @@
 version: 1
 runtime: bwrap
 gates:
-  test: 'true'
+  # `scripts/gate.sh` — python syntax, the stdlib test runner when a suite
+  # exists, and the negative requirements spec 001 phrases as searches of the
+  # source tree. It replaces the `true` builtin, which passed by existing.
+  # Every gate named here needs a job of the same name in
+  # .github/workflows/ergane-gates.yml, and the merge queue requires exactly
+  # those checks.
+  test: bash scripts/gate.sh
 landing_branch: main
 # Injected into every dispatched node's prompt as "Read `<path>` in this
 # worktree before you write code, and obey it." Resolved against the node's
