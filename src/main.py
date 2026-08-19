@@ -224,8 +224,8 @@ def create_expense(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
         conn.close()
 
 
-@app.delete("/api/expenses/{expense_id}")
-def delete_expense(expense_id: int):
+@app.delete("/api/expenses/{expense_id}", status_code=204)
+def delete_expense(expense_id: int) -> None:
     conn = get_conn()
     try:
         cursor = conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))

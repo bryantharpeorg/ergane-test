@@ -12,10 +12,11 @@ class ValidationError(ValueError):
 
 
 def parse_amount_to_cents(value: str) -> int:
-    """Convert a decimal dollar string to integer cents.
+    r"""Convert a decimal dollar string to integer cents.
 
-    Accepts values matching ^\d+(\.\d{1,2})?$, rejects zero, negative,
-    and more than two decimal places.
+    Accepts values matching ^\d+(\.\d{1,2})?$ such as "124.50", rejects
+    zero ("0"), negatives ("-5"), and more than two decimal places
+    ("12.345"). Returns integer cents strictly greater than zero.
     """
     value = value.strip()
     if not _AMOUNT_RE.match(value):
