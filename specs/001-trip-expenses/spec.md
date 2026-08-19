@@ -218,7 +218,19 @@ That is not hypothetical: US2 was first given FR-002, FR-009 and FR-010, whose
 schema and validators are built by US1's foundation. The judge failed it, and
 the next attempt "fixed" it by editing `src/validators.py` cosmetically so the
 file would appear in the graded diff — padding the diff to satisfy the grader,
-which is the exact failure Principle IV names. Those three moved to US1.
+which is the exact failure Principle IV names.
+
+**FR-002, FR-009 and FR-010 are therefore implemented by no node, deliberately.**
+Moving them to US1 was tried and is worse: US1 had already landed, and changing
+its `implements` changes its fingerprint, which makes the delta deriver *reopen*
+a story whose code is already on `main` (`us1 reopened: fingerprint changed`).
+The reopened node can only produce a trivial diff, which no judge can score as
+eight requirements, so it loops until the ladder exhausts.
+
+What that costs, stated plainly: those three requirements are verified by the
+gate and by US2's behaviour, and were never judge-verified. The alternative was
+an epic that cannot finish. A future spec that touches the schema or the
+validators should claim them.
 
 The cross-cutting negatives FR-020 (no authentication) and FR-021 (local only)
 sit on US1 for the same reason: US1 creates the skeleton, the routes and the
@@ -227,7 +239,7 @@ frontend the searches run over.
 ```yaml
 US1:
   depends_on: []
-  implements: [FR-001, FR-002, FR-003, FR-005, FR-009, FR-010, FR-020, FR-021]
+  implements: [FR-001, FR-003, FR-005, FR-020, FR-021]
 
 US2:
   depends_on: []
