@@ -311,6 +311,22 @@ def delete_expense(expense_id: int):
         conn.close()
 
 
+@app.delete("/api/trips/{trip_id}", status_code=204)
+def delete_trip(trip_id: int):
+    conn = get_conn()
+    try:
+        # Explicitly remove the trip's expenses first, then the trip itself,
+        # so the database never holds an orphaned expense even if the cascade
+        # were disabled by a missing pragma.
+        conn.execute("DELETE FROM expenses WHERE trip_id = ?", (trip_id,))
+        cursor = conn.execute("DELETE FROM trips WHERE id = ?", (trip_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="trip not found")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 @app.get("/trips/{trip_id}")
 def trip_detail(trip_id: int):
     return FileResponse(os.path.join(os.path.dirname(__file__), "frontend", "trip.html"))
