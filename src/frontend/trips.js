@@ -20,6 +20,7 @@ function renderTrips(trips) {
   const table = document.getElementById("trips-table");
   const emptyState = document.getElementById("empty-state");
   const tbody = document.getElementById("trips-body");
+  const thead = table.querySelector("thead tr");
 
   tbody.replaceChildren();
 
@@ -31,6 +32,17 @@ function renderTrips(trips) {
 
   table.hidden = false;
   emptyState.hidden = true;
+
+  thead.replaceChildren();
+  const headers = ["Name", "Destination", "Dates", "Total spent", ""];
+  for (const text of headers) {
+    const th = document.createElement("th");
+    th.textContent = text;
+    if (text === "Total spent") {
+      th.className = "numeric";
+    }
+    thead.appendChild(th);
+  }
 
   for (const trip of trips) {
     const row = document.createElement("tr");
@@ -51,7 +63,24 @@ function renderTrips(trips) {
     totalCell.className = "numeric";
     totalCell.textContent = formatCents(trip.total_cents);
 
-    row.append(nameCell, destinationCell, datesCell, totalCell);
+    const actionCell = document.createElement("td");
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const message = `Delete ${trip.name} and all its expenses? This cannot be undone.`;
+      if (!confirm(message)) {
+        return;
+      }
+
+      const response = await fetch(`/api/trips/${trip.id}`, { method: "DELETE" });
+      if (response.ok) {
+        await loadTrips();
+      }
+    });
+    actionCell.appendChild(deleteButton);
+
+    row.append(nameCell, destinationCell, datesCell, totalCell, actionCell);
     tbody.appendChild(row);
   }
 }
