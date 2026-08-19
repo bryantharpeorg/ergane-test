@@ -75,6 +75,40 @@ Promote with real frontmatter, or `ergane roadmap promote`.
 **The roadmap scheduler reads the local working tree**, not the pushed branch, on a 300s
 timer. An uncommitted spec marked `ready` is live to the factory immediately.
 
+A spec must also be **committed** before it dispatches — readiness is read from the
+working tree, but the node works in a git worktree, which carries only committed files.
+
+## A Spec Kit spec does not dispatch as written
+
+`/speckit-specify` produces prose. Ergane compiles one thing and only one thing: a
+`## Work Graph` section holding exactly one fenced YAML block, one entry per user story.
+Nothing infers it — a spec without that section is refused by
+`ergane spec validate` with `[section_missing]`, and no amount of well-written prose
+substitutes.
+
+```yaml
+US2:
+  depends_on: []                 # required, may be empty; unlocks on VERIFICATION
+  depends_on_merged: [US1]       # optional;               unlocks on MERGE
+  implements: [FR-002, FR-004]   # required; FR keys this spec declares
+  timeout: 5400                  # optional, seconds
+```
+
+Those five keys are the whole grammar; an unknown key is refused, not ignored. Two rules
+are worth knowing before you write one:
+
+- **Prefer `depends_on_merged` when stories share files.** Every node branches from the
+  landing branch at dispatch, so a `depends_on` edge can start US2 from a `main` that does
+  not yet contain US1's code.
+- **One node per user story, and nothing else exists.** Spec Kit's `tasks.md` habitually
+  opens with Setup and Foundational phases that name no story. Those reach no agent —
+  `ergane spec validate` reports them under `[slice_coverage]`. Shared groundwork belongs
+  inside the phase of the story that needs it first.
+
+A node's task slice is the `tasks.md` section **whose level-2 heading names its story**,
+so a task only reaches an agent by sitting under `## Phase n: User Story <n> - ...`. Task
+lines carry `[USn]`; the `(spec USn-Sk)` citation is what clears the `scenario_coverage`
+advisory, and it must name the same story as its slice.
 
 ## Commands
 
