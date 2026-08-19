@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip details — Trip Expenses</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container">
+    <a href="/" id="back-link">← All trips</a>
+    <header id="trip-header">
+      <h1 id="trip-name"></h1>
+      <p id="trip-meta"></p>
+    </header>
+
+    <section class="summary-section">
+      <h2>Total spent</h2>
+      <p id="trip-total" class="trip-total"></p>
+    </section>
+
+    <section class="subtotals-section" id="subtotals-section" hidden>
+      <h2>Spending by category</h2>
+      <div id="subtotals-block"></div>
+      <div id="chart-container" class="chart-container"></div>
+    </section>
+
+    <section class="form-section">
+      <h2>Add an expense</h2>
+      <form id="add-expense-form">
+        <div class="field">
+          <label for="date">Date</label>
+          <input type="date" id="date" name="date" required>
+          <span class="error" id="error-date"></span>
+        </div>
+        <div class="field">
+          <label for="amount">Amount (USD)</label>
+          <input type="text" id="amount" name="amount" inputmode="decimal" placeholder="0.00" required>
+          <span class="error" id="error-amount"></span>
+        </div>
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option value="">Choose a category…</option>
+            <option value="Lodging">Lodging</option>
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Gear">Gear</option>
+            <option value="Fees">Fees</option>
+            <option value="Other">Other</option>
+          </select>
+          <span class="error" id="error-category"></span>
+        </div>
+        <div class="field">
+          <label for="note">Note</label>
+          <input type="text" id="note" name="note" maxlength="500">
+          <span class="error" id="error-note"></span>
+        </div>
+        <button type="submit">Save expense</button>
+      </form>
+    </section>
+
+    <section class="filter-section" id="filter-section" hidden>
+      <label for="category-filter">Filter by category</label>
+      <select id="category-filter">
+        <option value="">All categories</option>
+      </select>
+    </section>
+
+    <section class="list-section">
+      <h2>Expenses</h2>
+      <div id="empty-state" class="empty-state" hidden>
+        No expenses yet. Add one above.
+      </div>
+      <table id="expenses-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Note</th>
+            <th class="numeric">Amount</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="expenses-body">
+        </tbody>
+      </table>
+    </section>
+
+    <section class="csv-section" id="csv-section" hidden>
+      <button id="export-btn" type="button">Export CSV</button>
+      <details id="import-details">
+        <summary>Import CSV</summary>
+        <textarea id="import-box" rows="8" placeholder="date,amount,category,note
+2026-07-18,45.00,Food,Breakfast"></textarea>
+        <button id="import-btn" type="button">Import</button>
+        <div id="import-result"></div>
+        <ul id="import-errors"></ul>
+      </details>
+    </section>
+  </main>
+
+  <script src="/static/trip-detail.js"></script>
+</body>
+</html>

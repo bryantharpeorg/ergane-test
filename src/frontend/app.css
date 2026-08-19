@@ -119,3 +119,8 @@ tbody tr:hover {
 .numeric {
   text-align: right;
 }
+
+.expense-over-threshold {
+  color: #dc2626;
+  font-weight: bold;
+}
