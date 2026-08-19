@@ -1,10 +1,13 @@
+import csv
+import io
 import os
+import re
 import sqlite3
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from db import get_conn, init_db, DATABASE_PATH
@@ -250,6 +253,136 @@ def delete_expense(expense_id: int):
         conn.commit()
     finally:
         conn.close()
+
+
+def _slugify(name: str) -> str:
+    """Turn a trip name into a safe filename fragment."""
+    return re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-") or "trip"
+
+
+@app.get("/api/trips/{trip_id}/export.csv")
+def export_csv(trip_id: int):
+    conn = get_conn()
+    try:
+        trip = conn.execute(
+            "SELECT id, name FROM trips WHERE id = ?",
+            (trip_id,),
+        ).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="trip not found")
+
+        expenses = conn.execute(
+            """
+            SELECT date, amount_cents, category, note
+            FROM expenses
+            WHERE trip_id = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (trip_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    def generate():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["date", "amount", "category", "note"])
+        for row in expenses:
+            writer.writerow([
+                row["date"],
+                format_cents(int(row["amount_cents"])),
+                row["category"],
+                row["note"],
+            ])
+            buf.seek(0)
+            data = buf.read()
+            buf.seek(0)
+            buf.truncate(0)
+            yield data
+
+    filename = f"{_slugify(trip['name'])}-expenses.csv"
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/trips/{trip_id}/import")
+def import_csv(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
+    conn = get_conn()
+    try:
+        trip = conn.execute("SELECT id FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            return JSONResponse({"errors": {"trip_id": "trip not found"}}, status_code=404)
+    finally:
+        conn.close()
+
+    raw_csv = payload.get("csv")
+    if not isinstance(raw_csv, str):
+        return JSONResponse({"errors": {"csv": "csv must be a string"}}, status_code=422)
+
+    reader = csv.reader(io.StringIO(raw_csv))
+
+    valid_rows: List[Tuple[str, int, str, str]] = []
+    skipped_details: List[Dict[str, Any]] = []
+
+    for line_index, cells in enumerate(reader, start=1):
+        if line_index == 1 and cells and cells[0].strip().casefold() == "date":
+            continue
+
+        if len(cells) != 4:
+            skipped_details.append({
+                "line": line_index,
+                "reason": f"expected 4 columns, got {len(cells)}",
+            })
+            continue
+
+        date_raw, amount_raw, category_raw, note = cells
+        note = note.strip()
+        if len(note) > 500:
+            skipped_details.append({"line": line_index, "reason": "note must be 500 characters or fewer"})
+            continue
+
+        try:
+            date = parse_date(date_raw)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_index, "reason": f"date {exc}"})
+            continue
+
+        try:
+            amount_cents = parse_amount_to_cents(amount_raw)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_index, "reason": f"amount {exc}"})
+            continue
+
+        try:
+            category = parse_category(category_raw, lenient=True)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_index, "reason": str(exc)})
+            continue
+
+        valid_rows.append((date, amount_cents, category, note))
+
+    conn = get_conn()
+    try:
+        for date, amount_cents, category, note in valid_rows:
+            conn.execute(
+                """
+                INSERT INTO expenses (trip_id, date, amount_cents, category, note)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (trip_id, date, amount_cents, category, note),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return JSONResponse({
+        "added": len(valid_rows),
+        "skipped": len(skipped_details),
+        "skipped_details": skipped_details,
+    })
 
 
 @app.get("/trips/{trip_id}")
