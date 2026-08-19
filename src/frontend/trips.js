@@ -68,7 +68,28 @@ function renderTrips(trips) {
     deleteButton.textContent = "Delete";
     deleteButton.addEventListener("click", async (event) => {
       event.stopPropagation();
-      const message = `Delete ${trip.name} and all its expenses? This cannot be undone.`;
+
+      let message;
+      try {
+        const expensesResponse = await fetch(`/api/trips/${trip.id}/expenses`);
+        if (expensesResponse.ok) {
+          const expenses = await expensesResponse.json();
+          if (expenses.length === 0) {
+            message = `Delete ${trip.name}? It has no expenses.\n\nThis cannot be undone.`;
+          } else {
+            const lines = expenses.map((expense) => {
+              const label = expense.note.trim() || expense.category;
+              return `  • ${label}: ${formatCents(expense.amount_cents)}`;
+            }).join("\n");
+            message = `Delete ${trip.name} and the following expenses?\n${lines}\n\nThis cannot be undone.`;
+          }
+        } else {
+          message = `Delete ${trip.name} and all its expenses? This cannot be undone.`;
+        }
+      } catch {
+        message = `Delete ${trip.name} and all its expenses? This cannot be undone.`;
+      }
+
       if (!confirm(message)) {
         return;
       }
