@@ -119,3 +119,65 @@ tbody tr:hover {
 .numeric {
   text-align: right;
 }
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.trip-header {
+  background: #fff;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.trip-meta {
+  color: #6b7280;
+  margin: 0.25rem 0;
+}
+
+.trip-total {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0 0;
+}
+
+.trip-section,
+.subtotals-section,
+.chart-section,
+.filter-section,
+.export-section,
+.import-section {
+  background: #fff;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+#expenses-table td:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
+
+#expenses-table button {
+  background: #dc2626;
+  align-self: center;
+}
+
+#expenses-table button:hover {
+  background: #b91c1c;
+}
+
+.expense-over-threshold {
+  color: #dc2626;
+  font-weight: 700;
+}
