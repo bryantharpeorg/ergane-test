@@ -264,6 +264,7 @@ document.getElementById("add-expense-form").addEventListener("submit", async (ev
 
   if (response.ok) {
     form.reset();
+    // Preserve the current category filter while refreshing everything else.
     await loadTrip();
   }
 });
