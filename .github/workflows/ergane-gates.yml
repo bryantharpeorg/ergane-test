@@ -4,8 +4,10 @@
 # job's `name`, and the merge queue requires a check named after each declared
 # gate — rename a job here and the factory refuses to dispatch against this repo.
 #
-# TODO(operator): add whatever toolchain setup your gate commands need. `ergane
-# init` writes the gates you declared; it does not guess how to install them.
+# `scripts/gate.sh` is stdlib-Python and shell on purpose: Ergane runs the same
+# command inside a bwrap worktree with no network, where nothing can be
+# installed. So there is no toolchain setup step here either — ubuntu-latest
+# already ships the python3 the gate uses.
 name: ergane gates
 
 on:
@@ -19,4 +21,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: "test"
-        run: "true"
+        run: bash scripts/gate.sh

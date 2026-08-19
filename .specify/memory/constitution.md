@@ -1,6 +1,6 @@
 <!--
 Sync Impact Report
-- Version change: none → 1.0.0 (initial ratification)
+- Version change: 1.0.0 → 1.1.0 (Principle II's known defect closed)
 - Modified principles: none (no prior version; file was the unfilled scaffold)
 - Added sections:
   - Core Principles I–V
@@ -13,8 +13,9 @@ Sync Impact Report
     the gates workflow) because the command was invoked with no user input.
     They describe how this repository is actually built today; the operator
     should review and amend before they are treated as binding.
-  - Principle II names `gates.test: 'true'` in ergane.yaml as a known defect.
-    Closing it is a governance change and needs its own spec.
+  - CLOSED at 1.1.0: `gates.test` is now `bash scripts/gate.sh`, a command that
+    fails on unparseable Python, on a failing stdlib test suite, and on the
+    negative requirements spec 001 phrases as searches of the source tree.
 -->
 # ergane-test Constitution
 
@@ -36,11 +37,19 @@ the record unless it is forced into the open.
 A gate MUST be a command capable of failing. Verification MUST be reproducible from a
 clean checkout with no operator-local state.
 
-`ergane.yaml` currently declares `gates.test: 'true'`, which passes unconditionally and
-proves nothing. This is a known defect, recorded here so it cannot be mistaken for a
-passing suite: **a green check from this gate is not evidence.** Any spec that adds
-executable code MUST also replace or extend that gate with one that fails when the code
-is wrong.
+`ergane.yaml` declares `gates.test: bash scripts/gate.sh`. Until 1.1.0 it declared the
+`true` builtin, which passed unconditionally; that defect is closed.
+
+A gate MUST run identically in the node's bwrap worktree and in the `test` job of the
+gates workflow, which means it MUST NOT require network access or an installed package —
+nothing can be installed inside the gate boundary. A gate MUST NOT be widened to pass:
+narrowing a check, excluding a path, or deleting an audit to turn it green is the
+violation Principle IV names.
+
+The gate is a floor, not proof. Acceptance scenarios are scored separately, by the judge,
+against the criteria snapshotted from `spec.md`. A gate that passes on a tree containing
+none of the code it checks has verified nothing yet — it has only found nothing to
+verify.
 
 ### III. Scoped, Reversible Change
 
@@ -117,4 +126,4 @@ Every proposal is reviewed against these principles. A proposal that violates on
 rejected, or this constitution MUST be amended first — a violation is never granted a
 silent exception. Complexity MUST be justified against the spec that asked for it.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-08-18
+**Version**: 1.1.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-08-19

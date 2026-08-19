@@ -36,13 +36,22 @@ Applies to everyone, operator and node alike.
 - The merge queue re-runs the gates on a `merge_group` event after the PR checks pass, so
   expect two workflow runs per landing.
 
-### The current gate proves nothing
+### The gate, and what it does not cover
 
-`ergane.yaml` declares `gates: {test: 'true'}` — the shell builtin, which always exits 0.
-Readiness reports `[PASS] gate_check:test` because the check *exists*, not because it
-verified anything. **A green check from this gate is not evidence.** Constitution
-Principle II requires any change that adds executable code to replace this gate with one
-that can fail, and to add the matching workflow job.
+`gates: {test: bash scripts/gate.sh}`. It checks Python syntax, runs `unittest discover`
+when a `tests/` directory exists, and greps `src/` for the negative requirements spec 001
+phrased as searches — no password input, no user table, no login route, no currency
+selection, no remote script or stylesheet.
+
+Everything in it is shell or stdlib Python **because it has to run in two places**: the
+`test` job on GitHub, and the node's bwrap worktree, which has `/usr` read-only and no
+network. Nothing can be installed there, so a gate needing pytest or FastAPI would fail
+every attempt for a reason unrelated to the diff.
+
+It is a floor, not proof. The acceptance scenarios are scored by the judge against
+criteria snapshotted out of `spec.md`; the gate catches what prose-reading cannot. On a
+tree with no `src/` every check is vacuous and passes — that is a gate finding nothing to
+verify, not a gate verifying nothing is wrong.
 
 ## Specs: two status conventions that do not talk to each other
 
@@ -65,6 +74,7 @@ Promote with real frontmatter, or `ergane roadmap promote`.
 
 **The roadmap scheduler reads the local working tree**, not the pushed branch, on a 300s
 timer. An uncommitted spec marked `ready` is live to the factory immediately.
+
 
 ## Commands
 
