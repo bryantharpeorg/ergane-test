@@ -3,13 +3,13 @@ import sqlite3
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from db import get_conn, init_db, DATABASE_PATH
 from seed import seed
-from validators import parse_amount_to_cents, parse_category, parse_date, format_cents, ValidationError
+from validators import parse_amount_to_cents, parse_category, parse_date, ValidationError
 
 
 @asynccontextmanager
@@ -235,7 +235,7 @@ def delete_expense(expense_id: int):
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="expense not found")
         conn.commit()
-        return JSONResponse({}, status_code=204)
+        return Response(status_code=204)
     finally:
         conn.close()
 
