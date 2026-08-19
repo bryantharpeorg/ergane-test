@@ -1,0 +1,5 @@
+version: 1
+runtime: bwrap
+gates:
+  test: 'true'
+landing_branch: main
