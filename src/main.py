@@ -1,10 +1,13 @@
+import csv
+import io
 import os
+import re
 import sqlite3
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from db import get_conn, init_db, DATABASE_PATH
@@ -323,6 +326,62 @@ def delete_trip(trip_id: int):
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="trip not found")
         conn.commit()
+    finally:
+        conn.close()
+
+
+def _slugify(value: str) -> str:
+    value = value.strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    value = value.strip("-")
+    return value or "trip"
+
+
+@app.get("/api/trips/{trip_id}/export.csv")
+def export_csv(trip_id: int) -> StreamingResponse:
+    conn = get_conn()
+    try:
+        trip = conn.execute(
+            "SELECT name FROM trips WHERE id = ?", (trip_id,)
+        ).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="trip not found")
+
+        rows = conn.execute(
+            """
+            SELECT date, amount_cents, category, note
+            FROM expenses
+            WHERE trip_id = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (trip_id,),
+        ).fetchall()
+
+        filename = f"{_slugify(trip['name'])}-expenses.csv"
+
+        def generate():
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["date", "amount", "category", "note"])
+            for row in rows:
+                writer.writerow([
+                    row["date"],
+                    format_cents(int(row["amount_cents"])),
+                    row["category"],
+                    row["note"],
+                ])
+                chunk = buf.getvalue()
+                buf.seek(0)
+                buf.truncate(0)
+                yield chunk
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            },
+        )
     finally:
         conn.close()
 
