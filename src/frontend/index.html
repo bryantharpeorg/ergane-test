@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Expenses</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Trip Expenses</h1>
+
+    <section class="form-section">
+      <h2>Add a trip</h2>
+      <form id="create-trip-form">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required>
+          <span class="error" id="error-name"></span>
+        </div>
+        <div class="field">
+          <label for="destination">Destination</label>
+          <input type="text" id="destination" name="destination" required>
+          <span class="error" id="error-destination"></span>
+        </div>
+        <div class="field">
+          <label for="start_date">Start date</label>
+          <input type="date" id="start_date" name="start_date" required>
+          <span class="error" id="error-start_date"></span>
+        </div>
+        <div class="field">
+          <label for="end_date">End date</label>
+          <input type="date" id="end_date" name="end_date" required>
+          <span class="error" id="error-end_date"></span>
+        </div>
+        <button type="submit">Save trip</button>
+      </form>
+    </section>
+
+    <section class="list-section">
+      <h2>Your trips</h2>
+      <div id="empty-state" class="empty-state" hidden>
+        No trips yet. Add one above.
+      </div>
+      <table id="trips-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Destination</th>
+            <th>Dates</th>
+            <th class="numeric">Total spent</th>
+          </tr>
+        </thead>
+        <tbody id="trips-body">
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/static/trips.js"></script>
+</body>
+</html>

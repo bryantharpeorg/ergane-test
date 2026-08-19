@@ -1,0 +1,12 @@
+services:
+  trip-expenses:
+    build: .
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - trip-expenses-data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/trip-expenses.db
+
+volumes:
+  trip-expenses-data:
