@@ -12,7 +12,7 @@ class ValidationError(ValueError):
 
 
 def parse_amount_to_cents(value: str) -> int:
-    """Convert a decimal dollar string to integer cents.
+    r"""Convert a decimal dollar string to integer cents.
 
     Accepts values matching ^\d+(\.\d{1,2})?$, rejects zero, negative,
     and more than two decimal places.
@@ -54,11 +54,14 @@ def parse_category(value: str, *, lenient: bool = False) -> str:
 
     Exact, case-sensitive match by default. When lenient is True, trim and
     case-fold the input first so spreadsheet values round-trip.
+
+    For example, parse_category("food", lenient=True) returns the canonical
+    "Food" because "food" case-insensitively matches the CATEGORIES tuple.
     """
     if lenient:
-        value = value.strip().casefold()
+        normalized = value.strip().casefold()
         for category in CATEGORIES:
-            if category.casefold() == value:
+            if category.casefold() == normalized:
                 return category
         raise ValidationError("category not one of the six")
     else:

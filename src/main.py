@@ -1,10 +1,13 @@
+import csv
+import io
 import os
+import re
 import sqlite3
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from db import get_conn, init_db, DATABASE_PATH
@@ -323,6 +326,143 @@ def delete_trip(trip_id: int):
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="trip not found")
         conn.commit()
+    finally:
+        conn.close()
+
+
+def _slugify(value: str) -> str:
+    value = value.strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    value = value.strip("-")
+    return value or "trip"
+
+
+@app.get("/api/trips/{trip_id}/export.csv")
+def export_csv(trip_id: int) -> StreamingResponse:
+    conn = get_conn()
+    try:
+        trip = conn.execute(
+            "SELECT name FROM trips WHERE id = ?", (trip_id,)
+        ).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="trip not found")
+
+        rows = conn.execute(
+            """
+            SELECT date, amount_cents, category, note
+            FROM expenses
+            WHERE trip_id = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (trip_id,),
+        ).fetchall()
+
+        filename = f"{_slugify(trip['name'])}-expenses.csv"
+
+        def generate():
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["date", "amount", "category", "note"])
+            for row in rows:
+                writer.writerow([
+                    row["date"],
+                    format_cents(int(row["amount_cents"])),
+                    row["category"],
+                    row["note"],
+                ])
+                chunk = buf.getvalue()
+                buf.seek(0)
+                buf.truncate(0)
+                yield chunk
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            },
+        )
+    finally:
+        conn.close()
+
+
+@app.post("/api/trips/{trip_id}/import")
+def import_csv(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
+    conn = get_conn()
+    try:
+        trip = conn.execute("SELECT id FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            return JSONResponse({"errors": {"trip_id": "trip not found"}}, status_code=404)
+    finally:
+        conn.close()
+
+    raw_csv = payload.get("csv")
+    if not isinstance(raw_csv, str):
+        return JSONResponse({"errors": {"csv": "csv text is required"}}, status_code=422)
+
+    reader = csv.reader(io.StringIO(raw_csv))
+
+    valid_rows: List[Tuple[str, int, str, str]] = []
+    skipped_details: List[Dict[str, Any]] = []
+    line_number = 0
+    first_row = True
+    for line_number, raw_row in enumerate(reader, start=1):
+        if first_row:
+            first_row = False
+            if raw_row and raw_row[0].strip().casefold() == "date":
+                continue
+
+        if len(raw_row) < 4:
+            skipped_details.append({"line": line_number, "reason": "row must have at least 4 columns"})
+            continue
+
+        date_raw, amount_raw, category_raw, note_raw, *_ = raw_row
+
+        try:
+            date = parse_date(date_raw)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_number, "reason": str(exc)})
+            continue
+
+        try:
+            amount_cents = parse_amount_to_cents(amount_raw)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_number, "reason": str(exc)})
+            continue
+
+        try:
+            category = parse_category(category_raw, lenient=True)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_number, "reason": str(exc)})
+            continue
+
+        note = note_raw.strip()
+        if len(note) > 500:
+            skipped_details.append({"line": line_number, "reason": "note must be 500 characters or fewer"})
+            continue
+
+        valid_rows.append((date, amount_cents, category, note))
+
+    conn = get_conn()
+    try:
+        with conn:
+            for date, amount_cents, category, note in valid_rows:
+                conn.execute(
+                    """
+                    INSERT INTO expenses (trip_id, date, amount_cents, category, note)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (trip_id, date, amount_cents, category, note),
+                )
+
+        return JSONResponse(
+            {
+                "added": len(valid_rows),
+                "skipped": len(skipped_details),
+                "skipped_details": skipped_details,
+            },
+            status_code=200,
+        )
     finally:
         conn.close()
 
