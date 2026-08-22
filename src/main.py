@@ -18,6 +18,7 @@ from validators import (
     parse_amount_to_cents,
     parse_category,
     parse_date,
+    parse_note,
 )
 
 
@@ -51,7 +52,7 @@ def _expense_row(row: sqlite3.Row) -> Dict[str, Any]:
         "date": row["date"],
         "amount_cents": row["amount_cents"],
         "category": row["category"],
-        "note": row["note"],
+        "note": row["note"] or None,
     }
 
 
@@ -265,15 +266,10 @@ def create_expense(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
         except ValidationError as exc:
             errors["category"] = str(exc)
 
-    raw_note = payload.get("note")
-    if raw_note is None:
-        note = ""
-    elif not isinstance(raw_note, str):
-        errors["note"] = "note must be text"
-    else:
-        note = raw_note.strip()
-        if len(note) > 500:
-            errors["note"] = "note must be 500 characters or fewer"
+    try:
+        note = parse_note(payload.get("note"))
+    except ValidationError as exc:
+        errors["note"] = str(exc)
 
     if errors:
         return JSONResponse({"errors": errors}, status_code=422)
@@ -285,7 +281,7 @@ def create_expense(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
             INSERT INTO expenses (trip_id, date, amount_cents, category, note)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (trip_id, date, amount_cents, category, note),
+            (trip_id, date, amount_cents, category, note if note is not None else ""),
         )
         expense_id = cursor.lastrowid
         conn.commit()
@@ -298,6 +294,37 @@ def create_expense(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
             ),
             status_code=201,
         )
+    finally:
+        conn.close()
+
+
+@app.patch("/api/expenses/{expense_id}")
+def update_expense_note(expense_id: int, payload: Dict[str, Any]) -> JSONResponse:
+    errors: Dict[str, str] = {}
+
+    try:
+        note = parse_note(payload.get("note"))
+    except ValidationError as exc:
+        errors["note"] = str(exc)
+
+    if errors:
+        return JSONResponse({"errors": errors}, status_code=422)
+
+    conn = get_conn()
+    try:
+        cursor = conn.execute(
+            "UPDATE expenses SET note = ? WHERE id = ?",
+            (note if note is not None else "", expense_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="expense not found")
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT id, trip_id, date, amount_cents, category, note FROM expenses WHERE id = ?",
+            (expense_id,),
+        ).fetchone()
+        return JSONResponse(_expense_row(row), status_code=200)
     finally:
         conn.close()
 
@@ -436,12 +463,13 @@ def import_csv(trip_id: int, payload: Dict[str, Any]) -> JSONResponse:
             skipped_details.append({"line": line_number, "reason": str(exc)})
             continue
 
-        note = note_raw.strip()
-        if len(note) > 500:
-            skipped_details.append({"line": line_number, "reason": "note must be 500 characters or fewer"})
+        try:
+            note = parse_note(note_raw)
+        except ValidationError as exc:
+            skipped_details.append({"line": line_number, "reason": str(exc)})
             continue
 
-        valid_rows.append((date, amount_cents, category, note))
+        valid_rows.append((date, amount_cents, category, note if note is not None else ""))
 
     conn = get_conn()
     try:

@@ -1,7 +1,8 @@
 import re
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 CATEGORIES: Tuple[str, ...] = ("Lodging", "Food", "Transport", "Gear", "Fees", "Other")
+NOTE_MAX_CHARS: int = 280
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _AMOUNT_RE = re.compile(r"^\d+(\.\d{1,2})?$")
@@ -46,6 +47,25 @@ def parse_date(value: str) -> str:
         max_day = 29 if leap else 28
         if day > max_day:
             raise ValidationError("must be a valid date")
+    return value
+
+
+def parse_note(value: Any) -> Optional[str]:
+    """Return a normalized note string, or None when the note is absent/blank.
+
+    A note that is None, empty, or only whitespace becomes None on the wire.
+    A note longer than NOTE_MAX_CHARS after trimming, or a non-string value,
+    raises ValidationError so every write path reports the same message.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValidationError("note must be text")
+    value = value.strip()
+    if value == "":
+        return None
+    if len(value) > NOTE_MAX_CHARS:
+        raise ValidationError("note must be 280 characters or fewer")
     return value
 
 
