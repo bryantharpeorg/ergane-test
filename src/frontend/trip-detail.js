@@ -197,9 +197,6 @@ function renderExpenses(expenses) {
     const categoryCell = document.createElement("td");
     categoryCell.textContent = expense.category;
 
-    const noteCell = document.createElement("td");
-    noteCell.textContent = expense.note;
-
     const amountCell = document.createElement("td");
     amountCell.className = "numeric";
     amountCell.textContent = formatCents(expense.amount_cents);
@@ -210,8 +207,18 @@ function renderExpenses(expenses) {
     deleteButton.addEventListener("click", () => deleteExpense(expense.id));
     actionCell.appendChild(deleteButton);
 
-    row.append(dateCell, categoryCell, noteCell, amountCell, actionCell);
+    row.append(dateCell, categoryCell, amountCell, actionCell);
     tbody.appendChild(row);
+
+    if (expense.note) {
+      const noteRow = document.createElement("tr");
+      noteRow.className = "expense-note";
+      const noteCell = document.createElement("td");
+      noteCell.colSpan = 4;
+      noteCell.textContent = expense.note;
+      noteRow.appendChild(noteCell);
+      tbody.appendChild(noteRow);
+    }
   }
 }
 
