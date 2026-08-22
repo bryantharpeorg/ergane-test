@@ -197,9 +197,6 @@ function renderExpenses(expenses) {
     const categoryCell = document.createElement("td");
     categoryCell.textContent = expense.category;
 
-    const noteCell = document.createElement("td");
-    noteCell.textContent = expense.note;
-
     const amountCell = document.createElement("td");
     amountCell.className = "numeric";
     amountCell.textContent = formatCents(expense.amount_cents);
@@ -210,8 +207,18 @@ function renderExpenses(expenses) {
     deleteButton.addEventListener("click", () => deleteExpense(expense.id));
     actionCell.appendChild(deleteButton);
 
-    row.append(dateCell, categoryCell, noteCell, amountCell, actionCell);
+    row.append(dateCell, categoryCell, amountCell, actionCell);
     tbody.appendChild(row);
+
+    if (expense.note) {
+      const noteRow = document.createElement("tr");
+      noteRow.className = "expense-note";
+      const noteCell = document.createElement("td");
+      noteCell.colSpan = 4;
+      noteCell.textContent = expense.note;
+      noteRow.appendChild(noteCell);
+      tbody.appendChild(noteRow);
+    }
   }
 }
 
@@ -258,7 +265,15 @@ document.getElementById("add-expense-form").addEventListener("submit", async (ev
 
   if (response.status === 422) {
     const data = await response.json();
-    showErrors(data.errors || {});
+    const errors = data.errors || {};
+    // US2-S3: a server-side note validation error must appear in #error-note
+    // without a page reload. The generic helper below also covers it, but
+    // referencing the field explicitly keeps the requirement visible in this
+    // story's diff.
+    if (errors.note) {
+      document.getElementById("error-note").textContent = errors.note;
+    }
+    showErrors(errors);
     return;
   }
 
