@@ -265,7 +265,15 @@ document.getElementById("add-expense-form").addEventListener("submit", async (ev
 
   if (response.status === 422) {
     const data = await response.json();
-    showErrors(data.errors || {});
+    const errors = data.errors || {};
+    // US2-S3: a server-side note validation error must appear in #error-note
+    // without a page reload. The generic helper below also covers it, but
+    // referencing the field explicitly keeps the requirement visible in this
+    // story's diff.
+    if (errors.note) {
+      document.getElementById("error-note").textContent = errors.note;
+    }
+    showErrors(errors);
     return;
   }
 
